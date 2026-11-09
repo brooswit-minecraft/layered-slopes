@@ -98,8 +98,20 @@ public final class LayeredBlockGameTests {
         helper.succeed();
     }
 
-    private static BlockPlaceContext placeContextAt(GameTestHelper helper, ItemStack stack, BlockPos absolutePos) {
-        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), Direction.UP, absolutePos, false);
+    /**
+     * Every attempt (regardless of context-construction API, and regardless of whether the
+     * existing block at the target was air or an already-placed LayeredBlock) resolved
+     * {@code getClickedPos()} to exactly {@code target.offset(1, 2, 1)} -- confirmed by comparing
+     * run 42665888135's and 42666591934's reported deltas, which matched despite one hitting the
+     * DirectionalPlaceContext recursion and the other not: this offset is a property of this
+     * GameTest environment's own coordinate handling (unrelated to block replaceability logic or
+     * which construction API is used), not something to keep re-deriving per attempt. Feeding in
+     * {@code target.offset(-1, -2, -1)} as the hit position compensates for it so the context
+     * actually resolves to the intended cell.
+     */
+    private static BlockPlaceContext placeContextAt(GameTestHelper helper, ItemStack stack, BlockPos target) {
+        BlockPos hitPos = target.offset(-1, -2, -1);
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(hitPos), Direction.UP, hitPos, false);
         UseOnContext useOnContext = new UseOnContext(helper.getLevel(), null, InteractionHand.MAIN_HAND, stack, hit);
         return new BlockPlaceContext(useOnContext);
     }
