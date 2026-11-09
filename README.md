@@ -47,36 +47,45 @@ unchanged from Dynamic Terrain's pre-split copy (verified against blob
 
 ## Test coverage — what's covered, what isn't
 
-Automated, headless (no game/mod-loader bootstrap) coverage: `LayerMathTest`,
-the layer arithmetic underlying shape/collision bounds and stacking
-limits. It's the only class in this family free of Minecraft types by
-design; `Anchor`/`LayeredBlock`/`LayeredGrassBlock`/`ClientEvents` all
-depend on Minecraft classes (`StringRepresentable`, `Block`,
-`RegisterColorHandlersEvent`, ...) that this project's plain `test`
-sourceSet has no classpath access to (confirmed: adding a test that merely
-references `Anchor` fails `compileTestJava` with "cannot access
-StringRepresentable") — reaching them needs a running game/mod-loader
-bootstrap this PR does not attempt, per review guidance not to invent a
-large test platform here. Dynamic Terrain's paired CI build (see its
-`ci.yml`) compiles and runs its own tests against this exact PR's build
-output, which is the automated evidence that the paired adaptation
-actually compiles against this extraction's real classes (not just the
-unrelated `v0.1.0` scaffold) — including catching the stale
-`ClientEvents`/`LAYERED_GRASS` reference this review flagged.
+Headless (no game bootstrap): `LayerMathTest` covers the layer arithmetic
+underlying shape/collision bounds and stacking limits. (`Anchor`/
+`LayeredBlock`/`LayeredGrassBlock`/`ClientEvents` depend on Minecraft
+classes this project's plain `test` sourceSet has no classpath access to
+— confirmed live, not assumed — so they aren't reachable from there.)
 
-**Explicitly not covered by automation, and not manually playtested in
-this PR** (per MINECRAFT-499's acceptance list): block
-placement/stacking/drops/render/collision/pathfinding behavior in a
-running game, standalone load, coinstalled load with Dynamic Terrain,
-actual client/server mod-loader classloading, and legacy-world/save
-upgrade. This mod's `LayeredBlock`/`LayeredGrassBlock`/`LayerMath`/`Anchor`
-are moved verbatim from Dynamic Terrain's pre-split implementation (same
-classes, package/import rename only), so their in-game behavior is
-expected to be unchanged from that pre-split, previously-shipped code —
-but that expectation is not itself test evidence. Establishing a
-GameTest/runtime harness for this lineage (neither Dynamic Terrain nor
-this mod has ever had one) is a bounded follow-up, not attempted in this
-PR per review guidance to avoid inventing a large test platform here.
+Real runtime evidence: `LayeredBlockGameTests` (`ci.yml`'s "Run GameTests"
+step, `./gradlew runGameTestServer` against a real NeoForge server with
+only this mod installed — `scripts/check_gametest_count.py` fails closed
+unless every named test below is confirmed to have actually run and
+passed, so a crashed or silently-empty run cannot read as success):
+- `placingAndStackingLayersUpdatesTheLayersProperty` — layers grow one at
+  a time from 1 to 16 on a real registered block in a live level, a full
+  block rejects further layers, and the collision shape reaches the top
+  of the cell at 16 layers.
+- `breakingALayeredBlockDropsOneItemPerLayer` — destroying a 5-layer
+  block drops exactly 5 items.
+- `legacyDynamicterrainRegistryNameStillResolves` — `dynamicterrain:layered_dirt`
+  resolves, at runtime, to this mod's own registered `LayeredBlock` — the
+  actual compatibility contract, not just the registration code reading
+  that way.
+
+The GameTest server actually booting with this mod installed is itself
+standalone-load and classloading evidence. Dynamic Terrain's paired CI
+build (see its `ci.yml`) compiles and runs its own tests against this
+exact PR's build output — the automated evidence that the paired
+adaptation compiles against this extraction's real classes, which is how
+the stale `ClientEvents`/`LAYERED_GRASS` and
+`LAYERED_SNOW_BLOCK` references this review flagged were actually caught.
+
+**Still not covered, and not manually playtested in this PR:** render
+(biome tint pixel output — needs a real client, not just the
+`RegisterColorHandlersEvent` registration this mod wires up), mob
+pathfinding over a layered slope, Dynamic Terrain *coinstalled* at
+runtime (its own PR is where that's exercised, since it's the consumer),
+and a representative legacy-world/save file loaded end-to-end rather than
+the direct registry-resolution proof above. These remain manual/follow-up
+per review guidance to keep this evidence bounded rather than building a
+general test platform.
 
 ## Building
 

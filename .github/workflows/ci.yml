@@ -30,6 +30,17 @@ jobs:
       - name: Build and test
         run: ./gradlew build --no-daemon
 
+      # Gradle reports BUILD SUCCESSFUL even when the GameTest server fails to start or ran zero
+      # tests, so a green exit code alone proves nothing (MINECRAFT-499 review: this is the
+      # standalone-load/runtime acceptance evidence for placement/stacking/drops/collision and the
+      # legacy dynamicterrain registry-name compatibility contract). check_gametest_count.py fails
+      # closed unless every named test below actually ran and passed.
+      - name: Run GameTests
+        run: |
+          set -o pipefail
+          ./gradlew runGameTestServer --no-daemon 2>&1 | tee gametest.log
+          python3 scripts/check_gametest_count.py gametest.log
+
       - name: Upload mod jar
         uses: actions/upload-artifact@v4
         with:
