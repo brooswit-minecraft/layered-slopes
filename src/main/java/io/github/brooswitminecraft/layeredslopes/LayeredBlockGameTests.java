@@ -37,36 +37,34 @@ public final class LayeredBlockGameTests {
 
     /**
      * Placement and stacking through the REAL player-interaction path (not a direct state
-     * mutation): {@link BlockItem#useOn} is exactly what a right-click dispatches to. First click
-     * targets the stone floor's top face (no layered block exists yet, so vanilla placement puts
-     * the new block in the cell above); every following click targets the layered block itself
-     * (so {@code canBeReplaced}'s {@code context.replacingClickedOnBlock()} path is exercised),
-     * growing it by one layer each time up to a full block, where a further click must be
-     * rejected (self-review 52615: a prior version of this test set {@code LAYERS} directly and
-     * never actually called the placement path).
+     * mutation): {@link BlockItem#useOn} is exactly what a right-click dispatches to. Every click
+     * targets the cell at {@code pos} directly, face UP: on an air cell that's always replaceable
+     * (so {@code BlockPlaceContext} keeps the target at the clicked position instead of shifting
+     * to a neighbor), and once a layered block occupies it, {@code canBeReplaced}'s own
+     * {@code context.replacingClickedOnBlock()}/{@code getClickedFace()} checks take over --
+     * exactly the "click straight down onto a growing snow-layer-style stack" interaction a player
+     * actually performs. Growing by one layer each time up to a full block, where a further click
+     * must be rejected (self-review 52615: a prior version of this test set {@code LAYERS} directly
+     * via {@code setBlock} and never actually called the placement path).
      */
     @GameTest(template = "flat_platform")
     public static void placingAndStackingLayersUpdatesTheLayersProperty(GameTestHelper helper) {
         BlockPos pos = new BlockPos(1, 1, 1);
-        BlockPos floorBelow = new BlockPos(1, 0, 1);
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         BlockItem item = (BlockItem) LayeredSlopesMod.LAYERED_STONE.get().asItem();
+        BlockPos absolutePos = helper.absolutePos(pos);
 
-        BlockPos clickedPos = floorBelow;
         for (int expectedLayers = LayerMath.MIN_LAYERS; expectedLayers <= LayerMath.MAX_LAYERS; expectedLayers++) {
-            BlockPos absoluteClicked = helper.absolutePos(clickedPos);
-            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absoluteClicked), Direction.UP, absoluteClicked, false);
+            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), Direction.UP, absolutePos, false);
             UseOnContext context = new UseOnContext(helper.getLevel(), player, InteractionHand.MAIN_HAND,
                     new ItemStack(item), hit);
             InteractionResult result = item.useOn(context);
             helper.assertTrue(result == InteractionResult.CONSUME,
                     "right-clicking to place/stack at " + (expectedLayers - 1) + " existing layers should succeed, got " + result);
             helper.assertBlockProperty(pos, LayeredBlock.LAYERS, expectedLayers);
-            clickedPos = pos; // every click after the first lands on the layered block itself
         }
 
         // One more click at full height must be rejected: the block stays unchanged.
-        BlockPos absolutePos = helper.absolutePos(pos);
         BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), Direction.UP, absolutePos, false);
         InteractionResult rejected = item.useOn(
                 new UseOnContext(helper.getLevel(), player, InteractionHand.MAIN_HAND, new ItemStack(item), hit));
