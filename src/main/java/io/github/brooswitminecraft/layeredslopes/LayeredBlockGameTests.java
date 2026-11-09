@@ -74,14 +74,18 @@ public final class LayeredBlockGameTests {
         // Scenario 1: click the solid floor below, face up -- the real interaction a player
         // performs to place the first layer. canBeReplaced/getStateForPlacement are called for
         // every one of the 16 layers below, not just once.
-        BlockPos below = absolute.below();
+        //
+        // Run 42667880916's logged data overturned the "click the neighbor below" theory: clicking
+        // `absolute.below()` resolved getClickedPos() to exactly that input, with NO shift at all
+        // (replacingClickedOnBlock=true even for that solid floor block) -- this BlockPlaceContext
+        // construction path simply never shifts position away from whatever BlockHitResult is
+        // given. So the correct, and simpler, click target for every layer is the cell itself.
         for (int expectedLayers = LayerMath.MIN_LAYERS; expectedLayers <= LayerMath.MAX_LAYERS; expectedLayers++) {
-            BlockPos clickAt = expectedLayers == LayerMath.MIN_LAYERS ? below : absolute;
-            BlockPlaceContext context = placeContextAt(helper, stack, clickAt);
+            BlockPlaceContext context = placeContextAt(helper, stack, absolute);
             BlockState existing = helper.getLevel().getBlockState(context.getClickedPos());
             LayeredSlopesMod.LOGGER.info(
-                    "layer {}: clickAt={} clickedPos={} replacingClickedOnBlock={} existing={}",
-                    expectedLayers, clickAt, context.getClickedPos(), context.replacingClickedOnBlock(), existing);
+                    "layer {}: clickedPos={} replacingClickedOnBlock={} existing={}",
+                    expectedLayers, context.getClickedPos(), context.replacingClickedOnBlock(), existing);
             helper.assertTrue(context.getClickedPos().equals(absolute),
                     "layer " + expectedLayers + ": expected clicked pos " + absolute + ", got " + context.getClickedPos());
             if (expectedLayers > LayerMath.MIN_LAYERS) {
