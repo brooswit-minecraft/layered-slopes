@@ -9,11 +9,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.item.context.DirectionalPlaceContext;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -38,18 +41,24 @@ public final class LayeredBlockGameTests {
      * {@code LAYERS} via {@code setValue} (self-review 52615's finding on the original version of
      * this test).
      *
+     * <p>Root cause of every earlier attempt's failure, finally pinned down with John's CI
+     * diagnostic on run 42665888135's full stack trace: {@code DirectionalPlaceContext} (the
+     * class vanilla's dispenser-placing-a-block behavior uses) overrides
+     * {@code replacingClickedOnBlock()} to COMPUTE it by calling {@code canPlace()}, which calls
+     * {@code state.canBeReplaced(this)} -- our override -- which calls
+     * {@code context.replacingClickedOnBlock()} again: infinite recursion, StackOverflowError,
+     * for any block (like this one, or vanilla's snow/candle-style blocks) whose
+     * {@code canBeReplaced} consults that flag. Regular {@code BlockPlaceContext} has no such
+     * cycle: {@code replacingClickedOnBlock()} there just returns a plain field computed ONCE in
+     * the constructor (which, for this specific block, happens to settle on {@code true} because
+     * the field reads back {@code false} by Java's own default-before-assignment semantics during
+     * that one-time computation, which makes our override's early-return branch fire and the
+     * field end up {@code true}) -- never calling back into our override, so no cycle. Switching
+     * the context-construction API, not reverting to direct state mutation, is the actual fix.
+     *
      * <p>Each of the three scenarios below (fresh placement, mid-stack, full) sets up its OWN
      * starting state directly via {@code helper.setBlock} -- legitimate test fixture setup, not
-     * the thing under test -- rather than chaining one simulated click's output into the next.
-     * Earlier CI attempts that DID chain real clicks (committing each resolved placement via
-     * {@code level.setBlock} at whatever position the place context itself resolved to, then
-     * reusing that as the next click's target) hit a resolved-position mismatch after the very
-     * first successful placement, on every attempt, regardless of which context-construction API
-     * was used (a GameTest/engine coordinate-transform detail never pinned down, not a
-     * LayeredBlock defect -- position resolution is generic vanilla {@code BlockPlaceContext}
-     * machinery, independent of which block is being placed). Isolating each scenario with its
-     * own fixture avoids depending on that chain while still exercising the real production
-     * decision logic for every one of them independently.
+     * the thing under test.
      */
     @GameTest(template = "flat_platform")
     public static void placingAndStackingLayersUpdatesTheLayersProperty(GameTestHelper helper) {
@@ -59,36 +68,29 @@ public final class LayeredBlockGameTests {
         ItemStack stack = new ItemStack(block.asItem());
 
         // Scenario 1: fresh placement onto air starts at 1 layer.
-        BlockState firstPlaced = runScenario(helper, "scenario1-air", () -> {
-            BlockPlaceContext airContext = new DirectionalPlaceContext(helper.getLevel(), absolute, Direction.UP, stack, Direction.UP);
-            helper.assertTrue(airContext.getClickedPos().equals(absolute),
-                    "placement context over air should resolve to the clicked cell, got " + airContext.getClickedPos());
-            return block.getStateForPlacement(airContext);
-        });
+        BlockPlaceContext airContext = placeContextAt(helper, stack, absolute);
+        helper.assertTrue(airContext.getClickedPos().equals(absolute),
+                "placement context over air should resolve to the clicked cell, got " + airContext.getClickedPos());
+        BlockState firstPlaced = block.getStateForPlacement(airContext);
         helper.assertTrue(firstPlaced != null && firstPlaced.getValue(LayeredBlock.LAYERS) == LayerMath.MIN_LAYERS,
                 "fresh placement over air should start at " + LayerMath.MIN_LAYERS + " layer(s)");
 
         // Scenario 2: clicking an existing, non-full layered block grows it by one.
         helper.setBlock(pos, block.defaultBlockState().setValue(LayeredBlock.LAYERS, 7));
-        BlockState stacked = runScenario(helper, "scenario2-stack", () -> {
-            BlockPlaceContext stackContext = new DirectionalPlaceContext(helper.getLevel(), absolute, Direction.UP, stack, Direction.UP);
-            helper.assertTrue(stackContext.getClickedPos().equals(absolute),
-                    "placement context over an existing layered block should resolve to the clicked cell, got " + stackContext.getClickedPos());
-            BlockState existingSeven = helper.getLevel().getBlockState(absolute);
-            helper.assertTrue(block.canBeReplaced(existingSeven, stackContext), "7 existing layers should allow stacking one more");
-            return block.getStateForPlacement(stackContext);
-        });
+        BlockPlaceContext stackContext = placeContextAt(helper, stack, absolute);
+        helper.assertTrue(stackContext.getClickedPos().equals(absolute),
+                "placement context over an existing layered block should resolve to the clicked cell, got " + stackContext.getClickedPos());
+        BlockState existingSeven = helper.getLevel().getBlockState(absolute);
+        helper.assertTrue(block.canBeReplaced(existingSeven, stackContext), "7 existing layers should allow stacking one more");
+        BlockState stacked = block.getStateForPlacement(stackContext);
         helper.assertTrue(stacked.getValue(LayeredBlock.LAYERS) == 8,
                 "expected 8 layers after stacking onto 7, got " + stacked.getValue(LayeredBlock.LAYERS));
 
         // Scenario 3: a full 16-layer block rejects further stacking.
         helper.setBlock(pos, block.defaultBlockState().setValue(LayeredBlock.LAYERS, LayerMath.MAX_LAYERS));
-        boolean fullCanBeReplaced = runScenario(helper, "scenario3-full", () -> {
-            BlockPlaceContext fullContext = new DirectionalPlaceContext(helper.getLevel(), absolute, Direction.UP, stack, Direction.UP);
-            BlockState existingFull = helper.getLevel().getBlockState(absolute);
-            return block.canBeReplaced(existingFull, fullContext);
-        });
-        helper.assertTrue(!fullCanBeReplaced, "a full 16-layer block must reject further stacking");
+        BlockPlaceContext fullContext = placeContextAt(helper, stack, absolute);
+        BlockState existingFull = helper.getLevel().getBlockState(absolute);
+        helper.assertTrue(!block.canBeReplaced(existingFull, fullContext), "a full 16-layer block must reject further stacking");
 
         BlockState full = helper.getBlockState(pos);
         helper.assertTrue(full.getCollisionShape(helper.getLevel(), absolute).bounds().maxY >= 0.99,
@@ -96,29 +98,10 @@ public final class LayeredBlockGameTests {
         helper.succeed();
     }
 
-    /**
-     * Runs one scenario's real-method calls, catching a {@link StackOverflowError} (or any other
-     * throwable) and re-throwing it with the scenario label and the top few stack frames attached
-     * -- GameTest's own log otherwise reports only "StackOverflowError" with no indication of
-     * which of the three scenarios (or which call within it) actually threw, confirmed live by
-     * run 42665243542 reporting exactly that with no further detail.
-     */
-    private interface Scenario<T> {
-        T run();
-    }
-
-    private static <T> T runScenario(GameTestHelper helper, String label, Scenario<T> scenario) {
-        try {
-            return scenario.run();
-        } catch (Throwable t) {
-            StringBuilder frames = new StringBuilder();
-            StackTraceElement[] trace = t.getStackTrace();
-            for (int i = 0; i < Math.min(8, trace.length); i++) {
-                frames.append("\n    at ").append(trace[i]);
-            }
-            helper.fail(label + " threw " + t.getClass().getName() + ": " + t.getMessage() + frames);
-            throw new AssertionError("unreachable");
-        }
+    private static BlockPlaceContext placeContextAt(GameTestHelper helper, ItemStack stack, BlockPos absolutePos) {
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), Direction.UP, absolutePos, false);
+        UseOnContext useOnContext = new UseOnContext(helper.getLevel(), null, InteractionHand.MAIN_HAND, stack, hit);
+        return new BlockPlaceContext(useOnContext);
     }
 
     /** Drops: breaking a layered block drops exactly as many items as it had layers. */
