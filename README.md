@@ -47,16 +47,22 @@ unchanged from Dynamic Terrain's pre-split copy (verified against blob
 
 ## Test coverage — what's covered, what isn't
 
-Automated, headless (no game/mod-loader bootstrap) coverage: `LayerMathTest`
-(the layer arithmetic underlying shape/collision bounds and stacking
-limits) and `AnchorTest` (floor/ceiling identity). `ClientEvents` (the
-biome grass tint, moved here from Dynamic Terrain per review) has no
-automated coverage of its own — `BiomeColors`/registry-dependent client
-rendering needs a running client, which these headless tests don't
-provide. Dynamic Terrain's paired CI build (see its `ci.yml`) compiles and
-runs its own tests against this exact PR's build output, which is the
-automated evidence that the paired adaptation actually compiles against
-this extraction's real classes (not just the unrelated `v0.1.0` scaffold).
+Automated, headless (no game/mod-loader bootstrap) coverage: `LayerMathTest`,
+the layer arithmetic underlying shape/collision bounds and stacking
+limits. It's the only class in this family free of Minecraft types by
+design; `Anchor`/`LayeredBlock`/`LayeredGrassBlock`/`ClientEvents` all
+depend on Minecraft classes (`StringRepresentable`, `Block`,
+`RegisterColorHandlersEvent`, ...) that this project's plain `test`
+sourceSet has no classpath access to (confirmed: adding a test that merely
+references `Anchor` fails `compileTestJava` with "cannot access
+StringRepresentable") — reaching them needs a running game/mod-loader
+bootstrap this PR does not attempt, per review guidance not to invent a
+large test platform here. Dynamic Terrain's paired CI build (see its
+`ci.yml`) compiles and runs its own tests against this exact PR's build
+output, which is the automated evidence that the paired adaptation
+actually compiles against this extraction's real classes (not just the
+unrelated `v0.1.0` scaffold) — including catching the stale
+`ClientEvents`/`LAYERED_GRASS` reference this review flagged.
 
 **Explicitly not covered by automation, and not manually playtested in
 this PR** (per MINECRAFT-499's acceptance list): block
