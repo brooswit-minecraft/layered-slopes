@@ -44,23 +44,23 @@ public final class LayeredBlockGameTests {
      * {@code LAYERS} via {@code setValue} (self-review 52615's finding on the original version of
      * this test).
      *
-     * <p>Three prior CI attempts assuming the resolved placement position exactly matches the
-     * clicked position (or a simple one-cell shift by the clicked face) each failed with a
-     * different, unexplained absolute-position mismatch in this environment -- a GameTest
-     * coordinate-transform detail never pinned down, not a LayeredBlock defect (position
-     * resolution is generic vanilla {@code BlockPlaceContext} machinery, independent of which
-     * block is being placed). Rather than guess a fifth time, this locks in whatever position the
-     * context resolves to on the FIRST real placement and verifies every later click (made
-     * directly against the already-placed block) keeps resolving to that SAME position -- still a
-     * real, non-fabricated runtime decision made by {@code getStateForPlacement}/
-     * {@code canBeReplaced}, just without this test also asserting its own unverified guess about
-     * which absolute coordinate that lands on.
+     * <p>Earlier CI attempts converting the resolved absolute placement position back to a
+     * structure-relative one (to use {@code GameTestHelper}'s relative-position convenience
+     * methods, which re-derive their own absolute position internally) kept landing on the wrong
+     * cell in this environment -- a coordinate-transform detail never pinned down, not a
+     * LayeredBlock defect (position resolution is generic vanilla {@code BlockPlaceContext}
+     * machinery, independent of which block is being placed). This version never converts back:
+     * it locks in whatever absolute position the context resolves to on the FIRST real placement,
+     * verifies every later click (made directly against the already-placed block) keeps resolving
+     * to that exact same absolute position, and reads/writes state at that absolute position
+     * directly through {@code helper.getLevel()} throughout -- still a real, non-fabricated
+     * runtime decision made by {@code getStateForPlacement}/{@code canBeReplaced}, just without
+     * ever needing to invert a transform this test doesn't actually need to know.
      */
     @GameTest(template = "flat_platform")
     public static void placingAndStackingLayersUpdatesTheLayersProperty(GameTestHelper helper) {
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
         LayeredBlock block = LayeredSlopesMod.LAYERED_STONE.get();
-        BlockPos originAbsolute = helper.absolutePos(BlockPos.ZERO);
         BlockPos clickAt = helper.absolutePos(new BlockPos(1, 1, 1));
 
         BlockPos targetAbsolute = null;
@@ -78,7 +78,7 @@ public final class LayeredBlockGameTests {
             BlockState placed = block.getStateForPlacement(context);
             helper.assertTrue(placed != null, "getStateForPlacement returned null");
             helper.getLevel().setBlock(resolved, placed, 3);
-            helper.assertBlockProperty(resolved.subtract(originAbsolute), LayeredBlock.LAYERS, expectedLayers);
+            assertLayers(helper, resolved, expectedLayers);
             clickAt = resolved; // every click after the first lands directly on the now-placed block
         }
 
@@ -86,13 +86,21 @@ public final class LayeredBlockGameTests {
         BlockPlaceContext rejectedContext = placeContextAt(helper, player, block, targetAbsolute);
         helper.assertTrue(!block.canBeReplaced(helper.getLevel().getBlockState(targetAbsolute), rejectedContext),
                 "placing against a full 16-layer block must be rejected");
-        BlockPos targetRelative = targetAbsolute.subtract(originAbsolute);
-        helper.assertBlockProperty(targetRelative, LayeredBlock.LAYERS, LayerMath.MAX_LAYERS);
+        assertLayers(helper, targetAbsolute, LayerMath.MAX_LAYERS);
 
-        BlockState full = helper.getBlockState(targetRelative);
+        BlockState full = helper.getLevel().getBlockState(targetAbsolute);
         helper.assertTrue(full.getCollisionShape(helper.getLevel(), targetAbsolute).bounds().maxY >= 0.99,
                 "a full 16-layer block's collision shape must reach the top of the cell");
         helper.succeed();
+    }
+
+    private static void assertLayers(GameTestHelper helper, BlockPos absolutePos, int expectedLayers) {
+        BlockState actual = helper.getLevel().getBlockState(absolutePos);
+        helper.assertTrue(actual.hasProperty(LayeredBlock.LAYERS),
+                "expected a LayeredBlock at " + absolutePos + ", got " + actual.getBlock());
+        int actualLayers = actual.getValue(LayeredBlock.LAYERS);
+        helper.assertTrue(actualLayers == expectedLayers,
+                "expected " + expectedLayers + " layers at " + absolutePos + ", got " + actualLayers);
     }
 
     private static BlockPlaceContext placeContextAt(GameTestHelper helper, ServerPlayer player, LayeredBlock block, BlockPos absolutePos) {
