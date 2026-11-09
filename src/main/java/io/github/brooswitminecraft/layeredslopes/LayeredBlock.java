@@ -23,9 +23,11 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * A 1/16-height layered block. Floor-anchored layers grow upward from the
  * bottom of the cell; ceiling-anchored layers grow downward from the top.
  * Placing more of the same block on a matching face adds a layer, up to a
- * full block. Layers stay where placed unless {@code caveInsEnabled} finds
- * them unsupported, in which case {@link CaveIns} drops them under gravity
- * like vanilla sand/gravel (see {@link net.minecraft.world.entity.item.FallingBlockEntity#fall}).
+ * full block. This class has no cave-in/gravity behavior of its own: an
+ * installed Dynamic Terrain may drop unsupported layers under gravity
+ * (its cave-ins feature, config-gated, gated separately from this mod),
+ * but that is Dynamic Terrain-owned external behavior, not something this
+ * standalone mod depends on or implements.
  */
 public class LayeredBlock extends Block {
     public static final MapCodec<LayeredBlock> CODEC = simpleCodec(LayeredBlock::new);
