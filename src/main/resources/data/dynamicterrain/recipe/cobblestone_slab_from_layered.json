@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "ingredients": [
+    { "item": "dynamicterrain:layered_cobblestone" },
+    { "item": "dynamicterrain:layered_cobblestone" },
+    { "item": "dynamicterrain:layered_cobblestone" },
+    { "item": "dynamicterrain:layered_cobblestone" },
+    { "item": "dynamicterrain:layered_cobblestone" },
+    { "item": "dynamicterrain:layered_cobblestone" },
+    { "item": "dynamicterrain:layered_cobblestone" },
+    { "item": "dynamicterrain:layered_cobblestone" }
+  ],
+  "result": {
+    "count": 1,
+    "id": "minecraft:cobblestone_slab"
+  }
+}

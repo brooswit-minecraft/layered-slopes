@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "ingredients": [
+    { "item": "dynamicterrain:layered_smooth_stone" },
+    { "item": "dynamicterrain:layered_smooth_stone" },
+    { "item": "dynamicterrain:layered_smooth_stone" },
+    { "item": "dynamicterrain:layered_smooth_stone" },
+    { "item": "dynamicterrain:layered_smooth_stone" },
+    { "item": "dynamicterrain:layered_smooth_stone" },
+    { "item": "dynamicterrain:layered_smooth_stone" },
+    { "item": "dynamicterrain:layered_smooth_stone" }
+  ],
+  "result": {
+    "count": 1,
+    "id": "minecraft:smooth_stone_slab"
+  }
+}

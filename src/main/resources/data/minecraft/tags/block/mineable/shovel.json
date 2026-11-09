@@ -1,0 +1,15 @@
+{
+  "values": [
+    "dynamicterrain:layered_clay",
+    "dynamicterrain:layered_coarse_dirt",
+    "dynamicterrain:layered_dirt",
+    "dynamicterrain:layered_grass",
+    "dynamicterrain:layered_gravel",
+    "dynamicterrain:layered_mud",
+    "dynamicterrain:layered_mycelium",
+    "dynamicterrain:layered_podzol",
+    "dynamicterrain:layered_red_sand",
+    "dynamicterrain:layered_sand",
+    "dynamicterrain:layered_snow_block"
+  ]
+}
