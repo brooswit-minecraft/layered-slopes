@@ -45,13 +45,32 @@ unchanged from Dynamic Terrain's pre-split copy (verified against blob
 `053f2699b6953378bf7e647ce424649eccf52e9c`, the pre-split
 `LayeredBlock.java`).
 
-`LayerMathTest` covers the pure layer arithmetic. Block placement/
-stacking/shape/drops/pathfinding behavior matches Dynamic Terrain's
-pre-split implementation unchanged (same classes, moved verbatim aside
-from the package and import rename) — distinguishing automated coverage
-from actual in-game playtest: **in-game playtest of this extraction has
-not been performed**; that remains a follow-up, same as for Dynamic
-Terrain's adapted side (MINECRAFT-499).
+## Test coverage — what's covered, what isn't
+
+Automated, headless (no game/mod-loader bootstrap) coverage: `LayerMathTest`
+(the layer arithmetic underlying shape/collision bounds and stacking
+limits) and `AnchorTest` (floor/ceiling identity). `ClientEvents` (the
+biome grass tint, moved here from Dynamic Terrain per review) has no
+automated coverage of its own — `BiomeColors`/registry-dependent client
+rendering needs a running client, which these headless tests don't
+provide. Dynamic Terrain's paired CI build (see its `ci.yml`) compiles and
+runs its own tests against this exact PR's build output, which is the
+automated evidence that the paired adaptation actually compiles against
+this extraction's real classes (not just the unrelated `v0.1.0` scaffold).
+
+**Explicitly not covered by automation, and not manually playtested in
+this PR** (per MINECRAFT-499's acceptance list): block
+placement/stacking/drops/render/collision/pathfinding behavior in a
+running game, standalone load, coinstalled load with Dynamic Terrain,
+actual client/server mod-loader classloading, and legacy-world/save
+upgrade. This mod's `LayeredBlock`/`LayeredGrassBlock`/`LayerMath`/`Anchor`
+are moved verbatim from Dynamic Terrain's pre-split implementation (same
+classes, package/import rename only), so their in-game behavior is
+expected to be unchanged from that pre-split, previously-shipped code —
+but that expectation is not itself test evidence. Establishing a
+GameTest/runtime harness for this lineage (neither Dynamic Terrain nor
+this mod has ever had one) is a bounded follow-up, not attempted in this
+PR per review guidance to avoid inventing a large test platform here.
 
 ## Building
 
