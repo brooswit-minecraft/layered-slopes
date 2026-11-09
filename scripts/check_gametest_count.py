@@ -25,7 +25,7 @@ class RuntimeEvidenceError(ValueError):
     """The GameTest log cannot prove a complete, non-trivial run."""
 
 
-EXPECTED_REQUIRED_TEST_COUNT = 3  # placingAndStacking.../breakingALayered.../legacyDynamicterrain...
+EXPECTED_REQUIRED_TEST_COUNT = 4  # placingAndStacking.../breakingALayered.../legacyDynamicterrain.../thinLayersStayPathfindable...
 
 
 def verify_runtime_log(log_text):

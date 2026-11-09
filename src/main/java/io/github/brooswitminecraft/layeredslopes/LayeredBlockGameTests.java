@@ -15,6 +15,7 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.pathfinder.PathComputationType;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -145,6 +146,38 @@ public final class LayeredBlockGameTests {
             helper.assertTrue(totalDropped == layers,
                     "expected " + layers + " dropped layered-stone items, got " + totalDropped);
         });
+    }
+
+    /**
+     * Pathfinding regression (Wroosbit review 52656): a thin layered block (below the walkable
+     * threshold) must stay pathfindable for land mobs, exactly like vanilla snow; a thick one must
+     * not, matching {@link LayeredBlock}'s own documented contract (mirrors vanilla
+     * {@code SnowLayerBlock}'s {@code layers < 5} of 8, scaled to 16). Calls the real
+     * {@code isPathfindable} override through a live {@code BlockState} in a running level, not a
+     * synthetic mock.
+     */
+    @GameTest(template = "flat_platform")
+    public static void thinLayersStayPathfindableThickOnesDoNot(GameTestHelper helper) {
+        LayeredBlock block = LayeredSlopesMod.LAYERED_STONE.get();
+        BlockPos pos = new BlockPos(1, 1, 1);
+
+        helper.setBlock(pos, block.defaultBlockState().setValue(LayeredBlock.LAYERS, 7));
+        BlockState thin = helper.getBlockState(pos);
+        helper.assertTrue(LayerMath.isWalkable(7), "LayerMath should consider 7 layers walkable");
+        helper.assertTrue(thin.isPathfindable(PathComputationType.LAND),
+                "7 layers (below the walkable threshold) must stay pathfindable for land mobs");
+
+        helper.setBlock(pos, block.defaultBlockState().setValue(LayeredBlock.LAYERS, 9));
+        BlockState thick = helper.getBlockState(pos);
+        helper.assertTrue(!LayerMath.isWalkable(9), "LayerMath should consider 9 layers not walkable");
+        helper.assertTrue(!thick.isPathfindable(PathComputationType.LAND),
+                "9 layers (at/above the walkable threshold) must not be pathfindable for land mobs");
+
+        helper.assertTrue(!thick.isPathfindable(PathComputationType.WATER),
+                "a layered block must never be water-pathfindable");
+        helper.assertTrue(!thick.isPathfindable(PathComputationType.AIR),
+                "a layered block must never be air-pathfindable");
+        helper.succeed();
     }
 
     /** Compatibility contract (MINECRAFT-499): the pre-split registry name must still resolve, now to this mod's block. */
