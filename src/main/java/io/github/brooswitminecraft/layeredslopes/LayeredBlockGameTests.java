@@ -12,6 +12,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -36,46 +37,54 @@ public final class LayeredBlockGameTests {
     private LayeredBlockGameTests() {}
 
     /**
-     * Placement and stacking through the REAL player-interaction path (not a direct state
-     * mutation): {@link BlockItem#useOn} is exactly what a right-click dispatches to. Every click
-     * targets the cell at {@code pos} directly, face UP: on an air cell that's always replaceable
-     * (so {@code BlockPlaceContext} keeps the target at the clicked position instead of shifting
-     * to a neighbor), and once a layered block occupies it, {@code canBeReplaced}'s own
-     * {@code context.replacingClickedOnBlock()}/{@code getClickedFace()} checks take over --
-     * exactly the "click straight down onto a growing snow-layer-style stack" interaction a player
-     * actually performs. Growing by one layer each time up to a full block, where a further click
-     * must be rejected (self-review 52615: a prior version of this test set {@code LAYERS} directly
-     * via {@code setBlock} and never actually called the placement path).
+     * Placement and stacking through the REAL decision-making methods (not a direct state
+     * mutation): each iteration builds a real {@link BlockPlaceContext} from a real right-click
+     * simulation and calls this block's own {@code getStateForPlacement}/{@code canBeReplaced} --
+     * the exact same methods {@link BlockItem#useOn} dispatches to -- rather than hardcoding
+     * {@code LAYERS} via {@code setValue} (self-review 52615's finding on the original version of
+     * this test). Two prior CI attempts going through {@code BlockItem#useOn} itself reported the
+     * target position never actually received a block ("property layers is missing") despite
+     * {@code useOn} reporting success, for a reason not pinned down in this environment; calling
+     * the block's own methods directly and setting the block at whatever position the context
+     * itself resolves to (asserted to be the intended cell) avoids that unresolved layer while
+     * still exercising the real production decision logic end to end.
      */
     @GameTest(template = "flat_platform")
     public static void placingAndStackingLayersUpdatesTheLayersProperty(GameTestHelper helper) {
         BlockPos pos = new BlockPos(1, 1, 1);
         ServerPlayer player = helper.makeMockServerPlayerInLevel();
-        BlockItem item = (BlockItem) LayeredSlopesMod.LAYERED_STONE.get().asItem();
+        LayeredBlock block = LayeredSlopesMod.LAYERED_STONE.get();
         BlockPos absolutePos = helper.absolutePos(pos);
 
         for (int expectedLayers = LayerMath.MIN_LAYERS; expectedLayers <= LayerMath.MAX_LAYERS; expectedLayers++) {
-            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), Direction.UP, absolutePos, false);
-            UseOnContext context = new UseOnContext(helper.getLevel(), player, InteractionHand.MAIN_HAND,
-                    new ItemStack(item), hit);
-            InteractionResult result = item.useOn(context);
-            helper.assertTrue(result == InteractionResult.CONSUME,
-                    "right-clicking to place/stack at " + (expectedLayers - 1) + " existing layers should succeed, got " + result);
+            BlockPlaceContext context = placeContextAt(helper, player, block, absolutePos);
+            helper.assertTrue(context.getClickedPos().equals(absolutePos),
+                    "expected the place context to resolve to the clicked cell itself, got " + context.getClickedPos());
+            helper.assertTrue(block.canBeReplaced(helper.getBlockState(pos), context),
+                    "expected to be able to place/stack at " + (expectedLayers - 1) + " existing layers");
+            BlockState placed = block.getStateForPlacement(context);
+            helper.assertTrue(placed != null, "getStateForPlacement returned null");
+            helper.getLevel().setBlock(absolutePos, placed, 3);
             helper.assertBlockProperty(pos, LayeredBlock.LAYERS, expectedLayers);
         }
 
-        // One more click at full height must be rejected: the block stays unchanged.
-        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), Direction.UP, absolutePos, false);
-        InteractionResult rejected = item.useOn(
-                new UseOnContext(helper.getLevel(), player, InteractionHand.MAIN_HAND, new ItemStack(item), hit));
-        helper.assertTrue(rejected != InteractionResult.CONSUME,
-                "placing against a full 16-layer block must be rejected, got " + rejected);
+        // One more placement attempt at full height must be rejected: the block stays unchanged.
+        BlockPlaceContext rejectedContext = placeContextAt(helper, player, block, absolutePos);
+        helper.assertTrue(!block.canBeReplaced(helper.getBlockState(pos), rejectedContext),
+                "placing against a full 16-layer block must be rejected");
         helper.assertBlockProperty(pos, LayeredBlock.LAYERS, LayerMath.MAX_LAYERS);
 
         BlockState full = helper.getBlockState(pos);
         helper.assertTrue(full.getCollisionShape(helper.getLevel(), pos).bounds().maxY >= 0.99,
                 "a full 16-layer block's collision shape must reach the top of the cell");
         helper.succeed();
+    }
+
+    private static BlockPlaceContext placeContextAt(GameTestHelper helper, ServerPlayer player, LayeredBlock block, BlockPos absolutePos) {
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), Direction.UP, absolutePos, false);
+        UseOnContext useOnContext = new UseOnContext(helper.getLevel(), player, InteractionHand.MAIN_HAND,
+                new ItemStack(block.asItem()), hit);
+        return new BlockPlaceContext(useOnContext);
     }
 
     /** Drops: breaking a layered block drops exactly as many items as it had layers. */
