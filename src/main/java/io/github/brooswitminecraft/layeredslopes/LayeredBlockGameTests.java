@@ -6,13 +6,14 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
@@ -36,29 +37,27 @@ public final class LayeredBlockGameTests {
 
     /**
      * Placement and stacking through the REAL decision-making methods (not a direct state
-     * mutation): calls this block's own {@code getStateForPlacement}/{@code canBeReplaced} --
+     * mutation): each click builds a real {@link BlockPlaceContext} from a real right-click
+     * simulation and calls this block's own {@code getStateForPlacement}/{@code canBeReplaced} --
      * the exact same methods {@link BlockItem#useOn} dispatches to -- rather than hardcoding
-     * {@code LAYERS} via {@code setValue} (self-review 52615's finding on the original version of
-     * this test).
+     * {@code LAYERS} via {@code setValue} (self-review 52615's finding on the original version).
      *
-     * <p>Root cause of every earlier attempt's failure, finally pinned down with John's CI
-     * diagnostic on run 42665888135's full stack trace: {@code DirectionalPlaceContext} (the
-     * class vanilla's dispenser-placing-a-block behavior uses) overrides
+     * <p>Root cause of the recursion in earlier attempts (John's CI diagnostic on run
+     * 42665888135's full stack trace): {@code DirectionalPlaceContext} overrides
      * {@code replacingClickedOnBlock()} to COMPUTE it by calling {@code canPlace()}, which calls
      * {@code state.canBeReplaced(this)} -- our override -- which calls
-     * {@code context.replacingClickedOnBlock()} again: infinite recursion, StackOverflowError,
-     * for any block (like this one, or vanilla's snow/candle-style blocks) whose
-     * {@code canBeReplaced} consults that flag. Regular {@code BlockPlaceContext} has no such
-     * cycle: {@code replacingClickedOnBlock()} there just returns a plain field computed ONCE in
-     * the constructor (which, for this specific block, happens to settle on {@code true} because
-     * the field reads back {@code false} by Java's own default-before-assignment semantics during
-     * that one-time computation, which makes our override's early-return branch fire and the
-     * field end up {@code true}) -- never calling back into our override, so no cycle. Switching
-     * the context-construction API, not reverting to direct state mutation, is the actual fix.
+     * {@code context.replacingClickedOnBlock()} again. Regular {@code BlockPlaceContext} has no
+     * such cycle: that flag is a plain field set once in the constructor.
      *
-     * <p>Each of the three scenarios below (fresh placement, mid-stack, full) sets up its OWN
-     * starting state directly via {@code helper.setBlock} -- legitimate test fixture setup, not
-     * the thing under test.
+     * <p>Root cause of the position mismatch in every attempt, confirmed with real logged data
+     * (not a guessed offset, per John's 52644) on run 42667344681: clicking an AIR cell directly
+     * does NOT resolve the placement target to that same cell -- {@code BlockPlaceContext}
+     * resolves it to {@code hitPos.relative(clickedFace)}, a clean single-axis shift, meaning air
+     * is not treated as "replace in place" at construction. This is exactly the real interaction a
+     * player performs anyway: to place the FIRST layer you click the solid floor BELOW the empty
+     * cell, face up, and the game places the new block in the cell above. Every later click (the
+     * cell now holds our own LayeredBlock, which {@code canBeReplaced} genuinely allows replacing
+     * in place) targets the cell itself directly, face up, with no shift.
      */
     @GameTest(template = "flat_platform")
     public static void placingAndStackingLayersUpdatesTheLayersProperty(GameTestHelper helper) {
@@ -67,50 +66,53 @@ public final class LayeredBlockGameTests {
         BlockPos absolute = helper.absolutePos(pos);
         ItemStack stack = new ItemStack(block.asItem());
 
-        // Scenario 1: fresh placement onto air starts at 1 layer.
-        BlockPlaceContext airContext = placeContextAt(helper, stack, absolute);
-        helper.assertTrue(airContext.getClickedPos().equals(absolute),
-                "placement context over air should resolve to " + absolute + ", got " + airContext.getClickedPos());
-        BlockState firstPlaced = block.getStateForPlacement(airContext);
-        helper.assertTrue(firstPlaced != null && firstPlaced.getValue(LayeredBlock.LAYERS) == LayerMath.MIN_LAYERS,
-                "fresh placement over air should start at " + LayerMath.MIN_LAYERS + " layer(s)");
+        // Explicitly establish air before the fresh-placement scenario (John's 52644): don't
+        // assume the template leaves this cell empty, assert it.
+        helper.setBlock(pos, Blocks.AIR.defaultBlockState());
+        log(helper, "scenario1-air", pos, absolute, helper.getLevel().getBlockState(absolute));
 
-        // Scenario 2: clicking an existing, non-full layered block grows it by one.
-        helper.setBlock(pos, block.defaultBlockState().setValue(LayeredBlock.LAYERS, 7));
-        BlockPlaceContext stackContext = placeContextAt(helper, stack, absolute);
-        helper.assertTrue(stackContext.getClickedPos().equals(absolute),
-                "placement context over an existing layered block should resolve to " + absolute + ", got " + stackContext.getClickedPos());
-        BlockState existingSeven = helper.getLevel().getBlockState(absolute);
-        helper.assertTrue(block.canBeReplaced(existingSeven, stackContext), "7 existing layers should allow stacking one more");
-        BlockState stacked = block.getStateForPlacement(stackContext);
-        helper.assertTrue(stacked.getValue(LayeredBlock.LAYERS) == 8,
-                "expected 8 layers after stacking onto 7, got " + stacked.getValue(LayeredBlock.LAYERS));
+        // Scenario 1: click the solid floor below, face up -- the real interaction a player
+        // performs to place the first layer. canBeReplaced/getStateForPlacement are called for
+        // every one of the 16 layers below, not just once.
+        BlockPos below = absolute.below();
+        for (int expectedLayers = LayerMath.MIN_LAYERS; expectedLayers <= LayerMath.MAX_LAYERS; expectedLayers++) {
+            BlockPos clickAt = expectedLayers == LayerMath.MIN_LAYERS ? below : absolute;
+            BlockPlaceContext context = placeContextAt(helper, stack, clickAt);
+            BlockState existing = helper.getLevel().getBlockState(context.getClickedPos());
+            LayeredSlopesMod.LOGGER.info(
+                    "layer {}: clickAt={} clickedPos={} replacingClickedOnBlock={} existing={}",
+                    expectedLayers, clickAt, context.getClickedPos(), context.replacingClickedOnBlock(), existing);
+            helper.assertTrue(context.getClickedPos().equals(absolute),
+                    "layer " + expectedLayers + ": expected clicked pos " + absolute + ", got " + context.getClickedPos());
+            if (expectedLayers > LayerMath.MIN_LAYERS) {
+                helper.assertTrue(block.canBeReplaced(existing, context),
+                        "layer " + expectedLayers + ": expected to be able to stack onto " + (expectedLayers - 1) + " existing layers");
+            }
+            BlockState placed = block.getStateForPlacement(context);
+            helper.assertTrue(placed != null && placed.getValue(LayeredBlock.LAYERS) == expectedLayers,
+                    "layer " + expectedLayers + ": expected getStateForPlacement to report " + expectedLayers
+                            + " layers, got " + (placed == null ? "null" : placed.getValue(LayeredBlock.LAYERS)));
+            helper.getLevel().setBlock(absolute, placed, 3);
+        }
 
-        // Scenario 3: a full 16-layer block rejects further stacking.
-        helper.setBlock(pos, block.defaultBlockState().setValue(LayeredBlock.LAYERS, LayerMath.MAX_LAYERS));
-        BlockPlaceContext fullContext = placeContextAt(helper, stack, absolute);
+        // One more click at full height must be rejected: the block stays unchanged.
+        BlockPlaceContext rejectedContext = placeContextAt(helper, stack, absolute);
         BlockState existingFull = helper.getLevel().getBlockState(absolute);
-        helper.assertTrue(!block.canBeReplaced(existingFull, fullContext), "a full 16-layer block must reject further stacking");
+        helper.assertTrue(!block.canBeReplaced(existingFull, rejectedContext),
+                "a full 16-layer block must reject further stacking");
+        helper.assertTrue(existingFull.getValue(LayeredBlock.LAYERS) == LayerMath.MAX_LAYERS,
+                "the full block must stay at " + LayerMath.MAX_LAYERS + " layers after the rejected click");
 
-        BlockState full = helper.getBlockState(pos);
-        helper.assertTrue(full.getCollisionShape(helper.getLevel(), absolute).bounds().maxY >= 0.99,
+        helper.assertTrue(existingFull.getCollisionShape(helper.getLevel(), absolute).bounds().maxY >= 0.99,
                 "a full 16-layer block's collision shape must reach the top of the cell");
         helper.succeed();
     }
 
-    /**
-     * Every attempt (regardless of context-construction API, and regardless of whether the
-     * existing block at the target was air or an already-placed LayeredBlock) resolved
-     * {@code getClickedPos()} to exactly {@code target.offset(1, 2, 1)} -- confirmed by comparing
-     * run 42665888135's and 42666591934's reported deltas, which matched despite one hitting the
-     * DirectionalPlaceContext recursion and the other not: this offset is a property of this
-     * GameTest environment's own coordinate handling (unrelated to block replaceability logic or
-     * which construction API is used), not something to keep re-deriving per attempt. Feeding in
-     * {@code target.offset(-1, -2, -1)} as the hit position compensates for it so the context
-     * actually resolves to the intended cell.
-     */
-    private static BlockPlaceContext placeContextAt(GameTestHelper helper, ItemStack stack, BlockPos target) {
-        BlockPos hitPos = target.offset(-1, -2, -1);
+    private static void log(GameTestHelper helper, String label, BlockPos relative, BlockPos absolute, BlockState state) {
+        LayeredSlopesMod.LOGGER.info("{}: relative={} absolute={} state={}", label, relative, absolute, state);
+    }
+
+    private static BlockPlaceContext placeContextAt(GameTestHelper helper, ItemStack stack, BlockPos hitPos) {
         BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(hitPos), Direction.UP, hitPos, false);
         UseOnContext useOnContext = new UseOnContext(helper.getLevel(), null, InteractionHand.MAIN_HAND, stack, hit);
         return new BlockPlaceContext(useOnContext);
