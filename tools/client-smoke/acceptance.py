@@ -66,7 +66,7 @@ try:
     if result.get('passed') is not True:
         raise RuntimeError('client did not report success')
     text = (root / 'client-acceptance-server.log').read_text(errors='replace')
-    if 'LAYERED_ACCEPTANCE_SERVER_PASS' not in text:
+    if 'LAYERED_ACCEPTANCE_SERVER_READY' not in text:
         raise RuntimeError('server never confirmed its acceptance fixture ran')
     print(json.dumps(result))
 finally:

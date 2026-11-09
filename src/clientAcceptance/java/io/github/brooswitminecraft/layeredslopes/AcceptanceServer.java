@@ -39,10 +39,10 @@ public final class AcceptanceServer {
                     LayeredSlopesMod.LAYERED_STONE.get().defaultBlockState()
                             .setValue(LayeredBlock.LAYERS, 4), 3);
             player.teleportTo(1, 101, 0);
+            // The client (AcceptanceClient) stops itself as soon as it has sampled the tint,
+            // which can happen well before any later tick count here -- so this is logged once
+            // the fixture is in place, not gated behind a tick count the client might outrace.
             LayeredSlopesMod.LOGGER.info("LAYERED_ACCEPTANCE_SERVER_READY");
-        }
-        if (ticks == 100) {
-            LayeredSlopesMod.LOGGER.info("LAYERED_ACCEPTANCE_SERVER_PASS");
         }
     }
 }
