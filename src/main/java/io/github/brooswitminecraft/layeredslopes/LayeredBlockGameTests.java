@@ -70,7 +70,7 @@ public final class LayeredBlockGameTests {
         // Scenario 1: fresh placement onto air starts at 1 layer.
         BlockPlaceContext airContext = placeContextAt(helper, stack, absolute);
         helper.assertTrue(airContext.getClickedPos().equals(absolute),
-                "placement context over air should resolve to the clicked cell, got " + airContext.getClickedPos());
+                "placement context over air should resolve to " + absolute + ", got " + airContext.getClickedPos());
         BlockState firstPlaced = block.getStateForPlacement(airContext);
         helper.assertTrue(firstPlaced != null && firstPlaced.getValue(LayeredBlock.LAYERS) == LayerMath.MIN_LAYERS,
                 "fresh placement over air should start at " + LayerMath.MIN_LAYERS + " layer(s)");
@@ -79,7 +79,7 @@ public final class LayeredBlockGameTests {
         helper.setBlock(pos, block.defaultBlockState().setValue(LayeredBlock.LAYERS, 7));
         BlockPlaceContext stackContext = placeContextAt(helper, stack, absolute);
         helper.assertTrue(stackContext.getClickedPos().equals(absolute),
-                "placement context over an existing layered block should resolve to the clicked cell, got " + stackContext.getClickedPos());
+                "placement context over an existing layered block should resolve to " + absolute + ", got " + stackContext.getClickedPos());
         BlockState existingSeven = helper.getLevel().getBlockState(absolute);
         helper.assertTrue(block.canBeReplaced(existingSeven, stackContext), "7 existing layers should allow stacking one more");
         BlockState stacked = block.getStateForPlacement(stackContext);
