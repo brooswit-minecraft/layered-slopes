@@ -5,13 +5,16 @@ Gradle reports BUILD SUCCESSFUL even when the GameTest server fails to start
 or ran zero tests, so a green `./gradlew runGameTestServer` exit code alone
 proves nothing. This checks the run's own log for unambiguous evidence: the
 server must not have failed to start, there must be no reported
-required-test failures, at least one required test must have actually
-completed and passed, and each of this mod's named acceptance tests
-(MINECRAFT-499) must appear as having run.
+required-test failures, and the completed/passed counts must both exactly
+equal the number of acceptance tests this mod declares (MINECRAFT-499).
 
-Pattern and REQUIRED_TEST_METHODS copied from Courier Craft's
-scripts/check_gametest_count.py (MINECRAFT-493), which established this as
-the org's standard GameTest acceptance-evidence guard.
+Live NeoForge GameTestServer log format (confirmed by an actual CI run, not
+assumed): passing tests are only ever counted, never individually named --
+"Running test batch 'defaultBatch:0' (3 tests)..." -- so a per-test-name
+substring check (as Courier Craft's MINECRAFT-493 guard does, whose overall
+pattern this is adapted from) cannot work here; only a failing test gets an
+explicit "<lowercased name> failed at ..." line. Matching the exact expected
+count is the strongest check this log format actually supports.
 """
 import re
 import sys
@@ -22,11 +25,7 @@ class RuntimeEvidenceError(ValueError):
     """The GameTest log cannot prove a complete, non-trivial run."""
 
 
-REQUIRED_TEST_METHODS = (
-    "placingAndStackingLayersUpdatesTheLayersProperty",
-    "breakingALayeredBlockDropsOneItemPerLayer",
-    "legacyDynamicterrainRegistryNameStillResolves",
-)
+EXPECTED_REQUIRED_TEST_COUNT = 3  # placingAndStacking.../breakingALayered.../legacyDynamicterrain...
 
 
 def verify_runtime_log(log_text):
@@ -41,11 +40,9 @@ def verify_runtime_log(log_text):
     if completed[0].end() > passed[0].start() or completed[0].group(1) != passed[0].group(1):
         raise RuntimeEvidenceError("completion/pass summaries are not one consistent terminal pair")
     count = int(completed[0].group(1))
-    if count == 0:
-        raise RuntimeEvidenceError("zero GameTests ran -- the server likely never registered any")
-    missing = [name for name in REQUIRED_TEST_METHODS if name not in log_text]
-    if missing:
-        raise RuntimeEvidenceError(f"required acceptance test(s) never ran: {', '.join(missing)}")
+    if count != EXPECTED_REQUIRED_TEST_COUNT:
+        raise RuntimeEvidenceError(
+            f"expected exactly {EXPECTED_REQUIRED_TEST_COUNT} required GameTests to complete and pass, got {count}")
     return count
 
 

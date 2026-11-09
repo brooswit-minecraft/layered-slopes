@@ -58,7 +58,10 @@ public final class LayeredBlockGameTests {
         int layers = 5;
         helper.setBlock(pos, LayeredSlopesMod.LAYERED_STONE.get().defaultBlockState()
                 .setValue(LayeredBlock.LAYERS, layers));
-        helper.destroyBlock(pos);
+        // helper.destroyBlock(pos) passes dropBlock=false (it's meant for test-prep cleanup, not
+        // simulating a player mining); call the level directly with dropBlock=true to actually
+        // get loot, confirmed live by the first CI run of this test: "got 0" with destroyBlock.
+        helper.getLevel().destroyBlock(helper.absolutePos(pos), true);
 
         helper.succeedWhen(() -> {
             BlockPos absolute = helper.absolutePos(pos);
