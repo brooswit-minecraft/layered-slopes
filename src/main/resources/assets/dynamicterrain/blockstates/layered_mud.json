@@ -1,0 +1,100 @@
+{
+  "variants": {
+    "anchor=floor,layers=1": {
+      "model": "dynamicterrain:block/layered_mud_floor_1"
+    },
+    "anchor=floor,layers=2": {
+      "model": "dynamicterrain:block/layered_mud_floor_2"
+    },
+    "anchor=floor,layers=3": {
+      "model": "dynamicterrain:block/layered_mud_floor_3"
+    },
+    "anchor=floor,layers=4": {
+      "model": "dynamicterrain:block/layered_mud_floor_4"
+    },
+    "anchor=floor,layers=5": {
+      "model": "dynamicterrain:block/layered_mud_floor_5"
+    },
+    "anchor=floor,layers=6": {
+      "model": "dynamicterrain:block/layered_mud_floor_6"
+    },
+    "anchor=floor,layers=7": {
+      "model": "dynamicterrain:block/layered_mud_floor_7"
+    },
+    "anchor=floor,layers=8": {
+      "model": "dynamicterrain:block/layered_mud_floor_8"
+    },
+    "anchor=floor,layers=9": {
+      "model": "dynamicterrain:block/layered_mud_floor_9"
+    },
+    "anchor=floor,layers=10": {
+      "model": "dynamicterrain:block/layered_mud_floor_10"
+    },
+    "anchor=floor,layers=11": {
+      "model": "dynamicterrain:block/layered_mud_floor_11"
+    },
+    "anchor=floor,layers=12": {
+      "model": "dynamicterrain:block/layered_mud_floor_12"
+    },
+    "anchor=floor,layers=13": {
+      "model": "dynamicterrain:block/layered_mud_floor_13"
+    },
+    "anchor=floor,layers=14": {
+      "model": "dynamicterrain:block/layered_mud_floor_14"
+    },
+    "anchor=floor,layers=15": {
+      "model": "dynamicterrain:block/layered_mud_floor_15"
+    },
+    "anchor=floor,layers=16": {
+      "model": "dynamicterrain:block/layered_mud_floor_16"
+    },
+    "anchor=ceiling,layers=1": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_1"
+    },
+    "anchor=ceiling,layers=2": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_2"
+    },
+    "anchor=ceiling,layers=3": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_3"
+    },
+    "anchor=ceiling,layers=4": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_4"
+    },
+    "anchor=ceiling,layers=5": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_5"
+    },
+    "anchor=ceiling,layers=6": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_6"
+    },
+    "anchor=ceiling,layers=7": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_7"
+    },
+    "anchor=ceiling,layers=8": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_8"
+    },
+    "anchor=ceiling,layers=9": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_9"
+    },
+    "anchor=ceiling,layers=10": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_10"
+    },
+    "anchor=ceiling,layers=11": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_11"
+    },
+    "anchor=ceiling,layers=12": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_12"
+    },
+    "anchor=ceiling,layers=13": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_13"
+    },
+    "anchor=ceiling,layers=14": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_14"
+    },
+    "anchor=ceiling,layers=15": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_15"
+    },
+    "anchor=ceiling,layers=16": {
+      "model": "dynamicterrain:block/layered_mud_ceiling_16"
+    }
+  }
+}

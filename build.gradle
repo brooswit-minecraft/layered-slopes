@@ -109,6 +109,17 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
+// MINECRAFT-499 / Wroosbit gap 1: a disposable, CI-only real client+server acceptance that the
+// client actually classloads with both mods and that ClientEvents' grass-tint color handler
+// actually fires at render time -- not just that the server compiles/boots (see
+// tools/client-smoke/acceptance.py, same pattern as Dynamic Vehicles' own client acceptance).
+// Never part of a normal build or release.
+if (project.hasProperty('clientAcceptance')) {
+    sourceSets.main.java.srcDir 'src/clientAcceptance/java'
+    neoForge.runs.client.gameDirectory = layout.projectDirectory.dir('run-acceptance-client')
+    neoForge.runs.server.gameDirectory = layout.projectDirectory.dir('run-acceptance-server')
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
