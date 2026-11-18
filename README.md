@@ -5,7 +5,8 @@ Layered floor/ceiling blocks extracted from Dynamic Terrain for NeoForge 1.21.1.
 NeoForge 1.21.1, Java 21. Mod ID: `layeredslopes`. MIT licensed.
 
 Ships the layered floor/ceiling block family, extracted from
-[Dynamic Terrain](https://github.com/brooswit-minecraft/dynamic-terrain)
+[Legacy Dynamic Terrain](https://github.com/brooswit-minecraft/legacy-dynamic-terrain)
+(formerly Dynamic Terrain)
 (MINECRAFT-499): `LayeredBlock`/`LayeredGrassBlock` (43 vanilla materials
 plus layered grass), `LayerMath` (pure 1/16-layer arithmetic) and `Anchor`
 (floor/ceiling). Covers normal block placement/stacking, block states,
