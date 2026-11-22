@@ -13,6 +13,7 @@ MAX_LAYERS = 16
 # block name -> (display name, texture, tool)
 MATERIALS = {
     "layered_dirt": ("Layered Dirt", "minecraft:block/dirt", "shovel"),
+    "layered_dirt_path": ("Layered Dirt Path", "minecraft:block/dirt_path_top", "shovel"),
     "layered_sand": ("Layered Sand", "minecraft:block/sand", "shovel"),
     "layered_gravel": ("Layered Gravel", "minecraft:block/gravel", "shovel"),
     "layered_stone": ("Layered Stone", "minecraft:block/stone", "pickaxe"),
@@ -92,6 +93,20 @@ def block_model(texture, ceiling, n, translucent=False):
     }
 
 
+def dirt_path_model(ceiling, n):
+    model = block_model("minecraft:block/dirt_path_top", ceiling, n)
+    model["textures"].update(top="minecraft:block/dirt_path_top",
+                             side="minecraft:block/dirt_path_side", bottom="minecraft:block/dirt")
+    faces = model["elements"][0]["faces"]
+    for direction, face in faces.items():
+        face["texture"] = "#top" if direction == "up" else "#bottom" if direction == "down" else "#side"
+        if direction not in ("up", "down"):
+            # Match the vanilla side's 15 usable rows, since its top row is transparent.
+            face["uv"] = [0, max(1, MAX_LAYERS - n), 16, 16]
+    del model["textures"]["all"]
+    return model
+
+
 def grass_model(ceiling, n, snowy=False):
     if ceiling:
         # Grass does not grow downward, and nothing meaningfully sits "above" a ceiling
@@ -162,14 +177,15 @@ for name, (display, texture, tool) in MATERIALS.items():
         anchor = "ceiling" if ceiling else "floor"
         for n in range(1, MAX_LAYERS + 1):
             model = f"{name}_{anchor}_{n}"
-            write(root / "models/block" / f"{model}.json", block_model(texture, ceiling, n, name in TRANSLUCENT))
+            write(root / "models/block" / f"{model}.json", dirt_path_model(ceiling, n) if name == "layered_dirt_path"
+                  else block_model(texture, ceiling, n, name in TRANSLUCENT))
             variants[f"anchor={anchor},layers={n}"] = {"model": f"{MOD}:block/{model}"}
     write(root / "blockstates" / f"{name}.json", {"variants": variants})
     write(root / "models/item" / f"{name}.json", {"parent": f"{MOD}:block/{name}_floor_8"})
     lang[f"block.{MOD}.{name}"] = display
 
-write(root / "lang/en_us.json", lang)
+write(root / "lang/en_us.json", dict(sorted(lang.items())))
 for tool in ("shovel", "pickaxe"):
     names = [n for n, spec in MATERIALS.items() if spec[2] == tool] + [n for n, spec in GRASS.items() if spec[1] == tool]
     if names:
-        write(data / f"minecraft/tags/block/mineable/{tool}.json", {"values": [f"{MOD}:{n}" for n in names]})
+        write(data / f"minecraft/tags/block/mineable/{tool}.json", {"values": [f"{MOD}:{n}" for n in sorted(names)]})

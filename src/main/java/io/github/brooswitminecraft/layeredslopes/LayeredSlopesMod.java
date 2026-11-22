@@ -38,6 +38,7 @@ public class LayeredSlopesMod {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(LEGACY_NAMESPACE);
 
     public static final DeferredBlock<LayeredBlock> LAYERED_DIRT = registerLayered("layered_dirt", Blocks.DIRT);
+    public static final DeferredBlock<LayeredBlock> LAYERED_DIRT_PATH = registerLayered("layered_dirt_path", Blocks.DIRT_PATH);
     public static final DeferredBlock<LayeredBlock> LAYERED_SAND = registerLayered("layered_sand", Blocks.SAND);
     public static final DeferredBlock<LayeredBlock> LAYERED_GRAVEL = registerLayered("layered_gravel", Blocks.GRAVEL);
 
@@ -86,6 +87,7 @@ public class LayeredSlopesMod {
 
     private static final List<DeferredItem<BlockItem>> LAYERED_ITEMS = List.of(
             ITEMS.registerSimpleBlockItem(LAYERED_DIRT),
+            ITEMS.registerSimpleBlockItem(LAYERED_DIRT_PATH),
             ITEMS.registerSimpleBlockItem(LAYERED_GRASS),
             ITEMS.registerSimpleBlockItem(LAYERED_STONE),
             ITEMS.registerSimpleBlockItem(LAYERED_COBBLESTONE),
