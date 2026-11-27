@@ -25,7 +25,7 @@ class RuntimeEvidenceError(ValueError):
     """The GameTest log cannot prove a complete, non-trivial run."""
 
 
-EXPECTED_REQUIRED_TEST_COUNT = 4  # placingAndStacking.../breakingALayered.../legacyDynamicterrain.../thinLayersStayPathfindable...
+EXPECTED_REQUIRED_TEST_COUNT = 5  # Includes the real dirt-path conversion/collision regression.
 
 
 def verify_runtime_log(log_text):
@@ -53,7 +53,7 @@ def main(argv):
         passed = verify_runtime_log(Path(argv[1]).read_text())
     except (OSError, RuntimeEvidenceError) as error:
         raise SystemExit(f"GameTest count guard failed: {error}") from error
-    print(f"GameTest count guard passed: {passed} required cases, including all three named acceptance tests")
+    print(f"GameTest count guard passed: {passed} required cases")
 
 
 if __name__ == "__main__":

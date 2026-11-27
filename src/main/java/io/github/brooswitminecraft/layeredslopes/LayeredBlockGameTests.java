@@ -191,4 +191,35 @@ public final class LayeredBlockGameTests {
         helper.assertTrue(resolved instanceof LayeredBlock, "the resolved block must actually be a LayeredBlock");
         helper.succeed();
     }
+
+    @GameTest(template = "flat_platform")
+    public static void dirtPathConversionPreservesItsFifteenLayerStartingHeight(GameTestHelper helper) {
+        BlockState path = Blocks.DIRT_PATH.defaultBlockState();
+        var layered = LayeredSlopesMod.LAYERED_DIRT_PATH.get();
+        var id = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("dynamicterrain", "layered_dirt_path");
+        helper.assertTrue(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(id) == layered,
+                "additive path registry ID must exist without moving other terrain IDs");
+        helper.assertTrue(LayeredBlock.floorLayerCount(path) == 15, "a vanilla path is not a full block");
+        helper.assertTrue(LayeredBlock.floorLayerCount(Blocks.DIRT.defaultBlockState()) == 16,
+                "ordinary full bases must retain their original semantics");
+        helper.assertTrue(layered.withFloorLayerDelta(path, 0) == path, "no-op must preserve vanilla dirt path");
+        BlockPos relative = new BlockPos(2, 2, 2);
+        BlockPos absolute = helper.absolutePos(relative);
+        helper.setBlock(relative.below(), Blocks.STONE.defaultBlockState());
+        for (int delta : new int[] {-1, 0, 1}) {
+            int layers = 15 + delta;
+            BlockState result = layered.withFloorLayerDelta(path, delta);
+            helper.setBlock(relative, result);
+            BlockState placed = helper.getLevel().getBlockState(absolute);
+            if (delta != 0) {
+                helper.assertTrue(placed.is(layered) && placed.getValue(LayeredBlock.LAYERS) == layers
+                        && placed.getValue(LayeredBlock.ANCHOR) == Anchor.FLOOR, "wrong converted path state");
+            } else {
+                helper.assertTrue(placed.is(Blocks.DIRT_PATH), "no-op path must stay vanilla");
+            }
+            double collisionTop = placed.getCollisionShape(helper.getLevel(), absolute).max(Direction.Axis.Y);
+            helper.assertTrue(Math.abs(collisionTop - layers / 16.0) < 1e-8, "path collision height must match layers");
+        }
+        helper.succeed();
+    }
 }

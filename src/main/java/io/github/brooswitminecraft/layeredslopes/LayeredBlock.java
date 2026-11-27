@@ -10,6 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
@@ -39,6 +40,38 @@ public class LayeredBlock extends Block {
     public LayeredBlock(Properties properties) {
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(LAYERS, LayerMath.MIN_LAYERS).setValue(ANCHOR, Anchor.FLOOR));
+    }
+
+    /**
+     * Initial height after a consumer has identified a convertible floor material.
+     * Ordinary full base blocks count as 16; vanilla dirt path is already one layer lower.
+     * Consumers must classify material eligibility and handle slabs, snow, and ceiling anchors
+     * explicitly rather than treating this helper as a shape or road classifier.
+     */
+    public static int floorLayerCount(BlockState source) {
+        if (source.getBlock() instanceof LayeredBlock) {
+            if (source.getValue(ANCHOR) != Anchor.FLOOR) {
+                throw new IllegalArgumentException("expected a floor-anchored layered block");
+            }
+            return source.getValue(LAYERS);
+        }
+        return source.is(Blocks.DIRT_PATH) ? LayerMath.MAX_LAYERS - 1 : LayerMath.MAX_LAYERS;
+    }
+
+    /**
+     * Convert this consumer-selected material's base state by an in-cell layer delta.
+     * A zero delta preserves the original state, including vanilla dirt path. The caller
+     * handles removing the last layer or spilling into the next cell.
+     */
+    public BlockState withFloorLayerDelta(BlockState source, int delta) {
+        if (delta == 0) return source;
+        int initial = floorLayerCount(source);
+        long target = (long) initial + delta;
+        if (target < LayerMath.MIN_LAYERS || target > LayerMath.MAX_LAYERS) {
+            throw new IllegalArgumentException("layer delta leaves this cell");
+        }
+        BlockState base = source.is(this) ? source : defaultBlockState();
+        return base.setValue(ANCHOR, Anchor.FLOOR).setValue(LAYERS, (int) target);
     }
 
     @Override
